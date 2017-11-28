@@ -100,6 +100,11 @@ func (c *Client) Gauge(bucket string, value interface{}) {
 	c.conn.gauge(c.prefix, bucket, value, c.tags)
 }
 
+// GaugeDelta records an offset value for the given bucket
+func (c *Client) GaugeDelta(bucket string, value interface{}) {
+	c.conn.gaugeDelta(c.prefix, bucket, value, c.tags)
+}
+
 // Timing sends a timing value to a bucket.
 func (c *Client) Timing(bucket string, value interface{}) {
 	if c.skip() {
