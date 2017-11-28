@@ -85,7 +85,7 @@ func (c *conn) metric(prefix, bucket string, n interface{}, typ string, rate flo
 	c.mu.Lock()
 	l := len(c.buf)
 	c.appendBucket(prefix, bucket, tags)
-	c.appendNumber(n)
+	c.appendNumber(n, false)
 	c.appendType(typ)
 	c.appendRate(rate)
 	c.closeMetric(tags)
@@ -100,16 +100,25 @@ func (c *conn) gauge(prefix, bucket string, value interface{}, tags string) {
 	// https://github.com/etsy/statsd/blob/master/docs/metric_types.md#gauges
 	if isNegative(value) {
 		c.appendBucket(prefix, bucket, tags)
-		c.appendGauge(0, tags)
+		c.appendGauge(0, false, tags)
 	}
 	c.appendBucket(prefix, bucket, tags)
-	c.appendGauge(value, tags)
+	c.appendGauge(value, false, tags)
 	c.flushIfBufferFull(l)
 	c.mu.Unlock()
 }
 
-func (c *conn) appendGauge(value interface{}, tags string) {
-	c.appendNumber(value)
+func (c *conn) gaugeDelta(prefix, bucket string, value interface{}, tags string) {
+	c.mu.Lock()
+	l := len(c.buf)
+	c.appendBucket(prefix, bucket, tags)
+	c.appendGauge(value, true, tags)
+	c.flushIfBufferFull(l)
+	c.mu.Unlock()
+}
+
+func (c *conn) appendGauge(value interface{}, delta bool, tags string) {
+	c.appendNumber(value, delta)
 	c.appendType("g")
 	c.closeMetric(tags)
 }
@@ -133,7 +142,11 @@ func (c *conn) appendString(s string) {
 	c.buf = append(c.buf, s...)
 }
 
-func (c *conn) appendNumber(v interface{}) {
+func (c *conn) appendNumber(v interface{}, sign bool) {
+	if sign && !isNegative(v) {
+		c.appendString("+")
+	}
+
 	switch n := v.(type) {
 	case int:
 		c.buf = strconv.AppendInt(c.buf, int64(n), 10)
